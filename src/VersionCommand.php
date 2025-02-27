@@ -30,13 +30,11 @@ class VersionCommand extends BaseCommand
             return 1;
         }
 
-        // Show current version
         if ($input->getOption('show')) {
             $output->writeln("<info>Current version: {$composerJson['version']}</info>");
             return 0;
         }
 
-        // Get version bump type
         $type = $input->getArgument('type');
         if (!$type) {
             $output->writeln('<error>Please specify a version type (patch, minor, major, prepatch, preminor, premajor)</error>');
@@ -46,13 +44,11 @@ class VersionCommand extends BaseCommand
         $currentVersion = $composerJson['version'];
         $newVersion = $this->bumpVersion($type, $currentVersion);
 
-        // Update composer.json
         $composerJson['version'] = $newVersion;
         file_put_contents('composer.json', json_encode($composerJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
 
         $output->writeln("<info>Version updated to: $newVersion</info>");
 
-        // Skip Git if --no-git option is provided
         if (!$input->getOption('no-git')) {
             $this->runGitCommands($newVersion, $output);
         } else {
