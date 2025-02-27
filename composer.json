@@ -6,7 +6,7 @@
     "require": {
         "php": ">=7.4",
         "composer-plugin-api": "^2.0",
-        "symfony/process": "^6.0",
+        "symfony/process": "*",
         "composer/composer": "^2.8"
     },
     "autoload": {
