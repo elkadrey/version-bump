@@ -3,11 +3,10 @@
 namespace Elkadrey\VersionBump;
 
 use Composer\Composer;
-use Composer\EventDispatcher\EventSubscriberInterface;
 use Composer\IO\IOInterface;
-use Composer\Plugin\Capability\CommandProvider;
 use Composer\Plugin\PluginInterface;
 use Composer\Plugin\Capable;
+use Composer\Plugin\Capability\CommandProvider;
 
 class VersionPlugin implements PluginInterface, Capable
 {
