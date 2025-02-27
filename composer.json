@@ -1,5 +1,5 @@
 {
-    "name": "elkadrey/versionbump",
+    "name": "elkadrey/version-bump",
     "type": "composer-plugin",
     "require": {
         "php": ">=7.4",
