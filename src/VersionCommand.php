@@ -23,13 +23,21 @@ class VersionCommand extends BaseCommand
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $composerJson = json_decode(file_get_contents('composer.json'), true);
-
-        if (!isset($composerJson['version'])) {
-            $output->writeln('<error>No version field in composer.json</error>');
+        if (!file_exists('composer.json')) {
+            $output->writeln('<error>composer.json not found in the project root.</error>');
             return 1;
         }
 
+        $composerJson = json_decode(file_get_contents('composer.json'), true);
+
+        // ✅ If version is missing, set default to "1.0.0"
+        if (!isset($composerJson['version']) || empty($composerJson['version'])) {
+            $composerJson['version'] = "1.0.0";
+            file_put_contents('composer.json', json_encode($composerJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+            $output->writeln('<comment>No version found in composer.json. Defaulting to 1.0.0</comment>');
+        }
+
+        // 🎯 Show current version
         if ($input->getOption('show')) {
             $output->writeln("<info>Current version: {$composerJson['version']}</info>");
             return 0;
@@ -37,11 +45,17 @@ class VersionCommand extends BaseCommand
 
         $type = $input->getArgument('type');
         if (!$type) {
-            $output->writeln('<error>Please specify a version type (patch, minor, major, prepatch, preminor, premajor)</error>');
+            $output->writeln('<error>Please specify a version type (patch, minor, major, prepatch, preminor, premajor).</error>');
             return 1;
         }
 
         $currentVersion = $composerJson['version'];
+
+        if (!preg_match('/^\d+\.\d+\.\d+$/', $currentVersion)) {
+            $output->writeln("<error>Invalid version format in composer.json: $currentVersion</error>");
+            return 1;
+        }
+
         $newVersion = $this->bumpVersion($type, $currentVersion);
 
         $composerJson['version'] = $newVersion;
@@ -50,7 +64,11 @@ class VersionCommand extends BaseCommand
         $output->writeln("<info>Version updated to: $newVersion</info>");
 
         if (!$input->getOption('no-git')) {
-            $this->runGitCommands($newVersion, $output);
+            if ($this->isGitAvailable()) {
+                $this->runGitCommands($newVersion, $output);
+            } else {
+                $output->writeln('<comment>Git is not installed or not available. Skipping Git operations.</comment>');
+            }
         } else {
             $output->writeln('<comment>Skipping Git operations (--no-git used).</comment>');
         }
@@ -60,48 +78,64 @@ class VersionCommand extends BaseCommand
 
     private function bumpVersion(string $type, string $currentVersion): string
     {
-        $parts = explode('.', $currentVersion);
-        [$major, $minor, $patch] = array_map('intval', $parts);
+        // Match normal and pre-release versions (e.g., 1.0.6, 1.0.6-beta.1)
+        if (preg_match('/^(\d+)\.(\d+)\.(\d+)(?:-(alpha|beta|rc)\.?(\d+)?)?$/', $currentVersion, $matches)) {
+            [$full, $major, $minor, $patch, $preType, $preNumber] = array_pad($matches, 6, null);
+            $major = (int) $major;
+            $minor = (int) $minor;
+            $patch = (int) $patch;
+            $preNumber = $preNumber !== null ? (int) $preNumber : null;
 
-        switch ($type) {
-            case 'patch':
-                $patch++;
-                break;
-            case 'minor':
-                $minor++;
-                $patch = 0;
-                break;
-            case 'major':
-                $major++;
-                $minor = 0;
-                $patch = 0;
-                break;
-            case 'prepatch':
-                $patch++;
-                return "$major.$minor.$patch-beta";
-            case 'preminor':
-                $minor++;
-                $patch = 0;
-                return "$major.$minor.$patch-beta";
-            case 'premajor':
-                $major++;
-                $minor = 0;
-                $patch = 0;
-                return "$major.$minor.$patch-beta";
-            default:
-                throw new \InvalidArgumentException("Invalid version type: $type");
+            switch ($type) {
+                case 'patch':
+                    return "$major.$minor." . ($patch + 1);
+                case 'minor':
+                    return "$major." . ($minor + 1) . ".0";
+                case 'major':
+                    return ($major + 1) . ".0.0";
+                case 'prepatch':
+                    return $this->incrementPreRelease($major, $minor, $patch + 1, $preType, $preNumber);
+                case 'preminor':
+                    return $this->incrementPreRelease($major, $minor + 1, 0, $preType, $preNumber);
+                case 'premajor':
+                    return $this->incrementPreRelease($major + 1, 0, 0, $preType, $preNumber);
+                default:
+                    throw new \InvalidArgumentException("Invalid version type: $type");
+            }
         }
 
-        return "$major.$minor.$patch";
+        throw new \InvalidArgumentException("Invalid version format in composer.json: $currentVersion");
     }
+
+    private function incrementPreRelease(int $major, int $minor, int $patch, ?string $preType, ?int $preNumber): string
+    {
+        $preType = $preType ?? 'beta'; // Default to beta if not provided
+        $preNumber = $preNumber !== null ? $preNumber + 1 : 1; // Increment pre-release or start at 1
+        return "$major.$minor.$patch-$preType.$preNumber";
+    }
+
+
+
+
 
     private function runGitCommands(string $version, OutputInterface $output)
     {
+        // Detect the current Git branch dynamically
+        $process = new Process(['git', 'rev-parse', '--abbrev-ref', 'HEAD']);
+        $process->run();
+
+        if (!$process->isSuccessful()) {
+            $output->writeln('<error>Failed to determine the current Git branch.</error>');
+            return;
+        }
+
+        $currentBranch = trim($process->getOutput());
+
         $commands = [
             "git add composer.json",
             "git commit -m 'chore(release): bump version to $version'",
             "git tag v$version",
-            "git push origin main --tags"
+            "git push origin $currentBranch --tags" // 🔥 Dynamically push to the current branch
         ];
 
         foreach ($commands as $command) {
@@ -110,7 +144,17 @@ class VersionCommand extends BaseCommand
 
             if (!$process->isSuccessful()) {
                 $output->writeln("<error>Git command failed: $command</error>");
+            } else {
+                $output->writeln("<info>Executed: $command</info>");
             }
         }
+    }
+
+
+    private function isGitAvailable(): bool
+    {
+        $process = new Process(['git', '--version']);
+        $process->run();
+        return $process->isSuccessful();
     }
 }
