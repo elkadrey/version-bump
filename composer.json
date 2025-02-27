@@ -1,5 +1,7 @@
 {
     "name": "elkadrey/version-bump",
+    "description": "A Composer plugin that allows you to manage versioning similar to npm version. It supports patch, minor, major, prepatch, preminor, premajor, and prerelease versioning while integrating with Git for tagging and commits",
+    "license": "MIT",
     "type": "composer-plugin",
     "require": {
         "php": ">=7.4",
