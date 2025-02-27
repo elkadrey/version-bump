@@ -51,11 +51,6 @@ class VersionCommand extends BaseCommand
 
         $currentVersion = $composerJson['version'];
 
-        if (!preg_match('/^\d+\.\d+\.\d+$/', $currentVersion)) {
-            $output->writeln("<error>Invalid version format in composer.json: $currentVersion</error>");
-            return 1;
-        }
-
         $newVersion = $this->bumpVersion($type, $currentVersion);
 
         $composerJson['version'] = $newVersion;
@@ -93,14 +88,16 @@ class VersionCommand extends BaseCommand
                     return "$major." . ($minor + 1) . ".0";
                 case 'major':
                     return ($major + 1) . ".0.0";
+                case 'prerelease':
+                    return $this->incrementPreRelease($major, $minor, $patch, $preType, $preNumber + 1);
                 case 'prepatch':
-                    return $this->incrementPreRelease($major, $minor, $patch + 1, $preType, $preNumber);
+                    return $this->incrementPreRelease($major, $minor, $patch + 1, $preType, 0);
                 case 'preminor':
-                    return $this->incrementPreRelease($major, $minor + 1, 0, $preType, $preNumber);
+                    return $this->incrementPreRelease($major, $minor + 1, 0, $preType, 0);
                 case 'premajor':
-                    return $this->incrementPreRelease($major + 1, 0, 0, $preType, $preNumber);
+                    return $this->incrementPreRelease($major + 1, 0, 0, $preType, 0);
                 default:
-                    throw new \InvalidArgumentException("Invalid version type: $type");
+                    return $type;
             }
         }
 
@@ -110,7 +107,6 @@ class VersionCommand extends BaseCommand
     private function incrementPreRelease(int $major, int $minor, int $patch, ?string $preType, ?int $preNumber): string
     {
         $preType = $preType ?? 'beta'; // Default to beta if not provided
-        $preNumber = $preNumber !== null ? $preNumber + 1 : 1; // Increment pre-release or start at 1
         return "$major.$minor.$patch-$preType.$preNumber";
     }
 
