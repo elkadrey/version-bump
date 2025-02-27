@@ -1,6 +1,5 @@
 {
-    "name": "elkadrey/version-bump",
-    "description": "Versions handles versioning in composer",
+    "name": "elkadrey/versionbump",
     "type": "composer-plugin",
     "require": {
         "php": ">=7.4",
@@ -14,8 +13,6 @@
         }
     },
     "extra": {
-        "composer-plugin": {
-            "class": "Elkadrey\\VersionBump\\VersionPlugin"
-        }
+        "class": "Elkadrey\\VersionBump\\VersionPlugin"
     }
 }
