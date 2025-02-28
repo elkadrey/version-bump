@@ -97,7 +97,9 @@ class VersionCommand extends BaseCommand
                 case 'premajor':
                     return $this->incrementPreRelease($major + 1, 0, 0, $preType, 0);
                 default:
-                    return $type;
+                    if(preg_match('/^v?\d+(\.\d+){0,3}|^dev-/', $type))
+                        return $type;
+                    else throw new \InvalidArgumentException("Invalid version format in composer.json: $type");
             }
         }
 
